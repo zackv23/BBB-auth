@@ -26,8 +26,8 @@ def _require(name: str) -> str:
     return value
 
 
-def _parse_positive_int(name: str, default: int) -> int:
-    raw = os.getenv(name, str(default)).strip()
+def _parse_positive_int(name: str, raw: str, default: int) -> int:
+    raw = raw.strip() if raw.strip() else str(default)
     try:
         value = int(raw)
     except ValueError as e:
@@ -52,8 +52,8 @@ class ServiceSettings:
             self.uses_generated_dev_secret = True
         self.jwt_issuer = os.getenv("JWT_ISSUER", os.getenv("BACKEND_URL", "http://localhost:8000"))
         self.jwt_audience = os.getenv("JWT_AUDIENCE", "bbb-api")
-        self.access_token_minutes = _parse_positive_int("ACCESS_TOKEN_MINUTES", 15)
-        self.refresh_token_days = _parse_positive_int("REFRESH_TOKEN_DAYS", 30)
+        self.access_token_minutes_raw = os.getenv("ACCESS_TOKEN_MINUTES", "15")
+        self.refresh_token_days_raw = os.getenv("REFRESH_TOKEN_DAYS", "30")
 
 
 oauth_settings = OAuthSettings()
@@ -85,7 +85,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="BBB-auth OAuth Layer", version="1.0.0", lifespan=lifespan)
 
-allowed_origins = _env_csv("ALLOWED_ORIGINS", os.getenv("WEBSITE_URL", "http://localhost:3000"))
+allowed_origins = get_service_settings().allowed_origins
 if allowed_origins:
     app.add_middleware(
         CORSMiddleware,
@@ -124,7 +124,18 @@ def _issue(provider_user: dict[str, Any]) -> tuple[str, str]:
             **base_claims,
             "typ": "access",
             "jti": secrets.token_urlsafe(12),
-            "exp": int((now + timedelta(minutes=service_settings.access_token_minutes)).timestamp()),
+            "exp": int(
+                (
+                    now
+                    + timedelta(
+                        minutes=_parse_positive_int(
+                            "ACCESS_TOKEN_MINUTES",
+                            service_settings.access_token_minutes_raw,
+                            15,
+                        )
+                    )
+                ).timestamp()
+            ),
         },
         service_settings.jwt_secret,
         algorithm="HS256",
@@ -134,7 +145,18 @@ def _issue(provider_user: dict[str, Any]) -> tuple[str, str]:
             **base_claims,
             "typ": "refresh",
             "jti": secrets.token_urlsafe(12),
-            "exp": int((now + timedelta(days=service_settings.refresh_token_days)).timestamp()),
+            "exp": int(
+                (
+                    now
+                    + timedelta(
+                        days=_parse_positive_int(
+                            "REFRESH_TOKEN_DAYS",
+                            service_settings.refresh_token_days_raw,
+                            30,
+                        )
+                    )
+                ).timestamp()
+            ),
         },
         service_settings.jwt_secret,
         algorithm="HS256",
