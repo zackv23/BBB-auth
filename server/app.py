@@ -87,13 +87,15 @@ def _issue(provider_user: dict[str, Any]) -> tuple[str, str]:
         raise HTTPException(status_code=503, detail="JWT signing secret not configured")
 
     now = datetime.now(UTC)
+    provider = str(provider_user.get("provider") or "unknown")
+    identity = str(provider_user.get("id") or provider_user.get("email") or "unknown")
     base_claims = {
         "iss": service_settings.jwt_issuer,
         "aud": service_settings.jwt_audience,
-        "sub": str(provider_user.get("id") or provider_user.get("email") or "unknown"),
+        "sub": f"{provider}:{identity}",
         "email": provider_user.get("email"),
         "name": provider_user.get("name"),
-        "provider": provider_user.get("provider"),
+        "provider": provider,
         "iat": int(now.timestamp()),
     }
     access_token = jwt.encode(

@@ -87,7 +87,7 @@ Required runtime environment variables:
 Optional token configuration:
 
 - `REDIS_URL` (default `redis://localhost:6379/0`)
-- Dev/local/test fallback JWT secret is auto-generated as `dev-only-insecure-jwt-secret` when `JWT_SECRET` is unset
+- Dev/local/test fallback JWT secret defaults to fixed value `dev-only-insecure-jwt-secret` when `JWT_SECRET` is unset
 - `JWT_ISSUER` (defaults to `BACKEND_URL`)
 - `JWT_AUDIENCE` (defaults to `bbb-api`)
 - `ACCESS_TOKEN_MINUTES` (default `15`)
