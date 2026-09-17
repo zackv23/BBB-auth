@@ -56,12 +56,20 @@ class ServiceSettings:
         self.refresh_token_days = _parse_positive_int("REFRESH_TOKEN_DAYS", 30)
 
 
-service_settings = ServiceSettings()
 oauth_settings = OAuthSettings()
+_service_settings: ServiceSettings | None = None
+
+
+def get_service_settings() -> ServiceSettings:
+    global _service_settings
+    if _service_settings is None:
+        _service_settings = ServiceSettings()
+    return _service_settings
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    service_settings = get_service_settings()
     if service_settings.environment not in ("development", "local", "test"):
         _require("JWT_SECRET")
 
@@ -77,10 +85,11 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="BBB-auth OAuth Layer", version="1.0.0", lifespan=lifespan)
 
-if service_settings.allowed_origins:
+allowed_origins = _env_csv("ALLOWED_ORIGINS", os.getenv("WEBSITE_URL", "http://localhost:3000"))
+if allowed_origins:
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=service_settings.allowed_origins,
+        allow_origins=allowed_origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
@@ -94,6 +103,7 @@ async def get_redis() -> Redis:
 
 
 def _issue(provider_user: dict[str, Any]) -> tuple[str, str]:
+    service_settings = get_service_settings()
     if not service_settings.jwt_secret:
         raise HTTPException(status_code=503, detail="JWT signing secret not configured")
 

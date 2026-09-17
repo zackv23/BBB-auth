@@ -80,13 +80,13 @@ uvicorn app:app --host 0.0.0.0 --port 8000
 
 Required runtime environment variables:
 
+- Reachable Redis instance at `REDIS_URL` (defaults to `redis://localhost:6379/0` if unset)
 - `JWT_SECRET` (required outside development/local/test)
 - `ALLOWED_ORIGINS` (comma-separated UI origins)
 - Provider credentials as needed (`GOOGLE_*`, `APPLE_*`, `GITHUB_*`)
 
 Optional token configuration:
 
-- `REDIS_URL` (default `redis://localhost:6379/0`)
 - Dev/local/test can run without `JWT_SECRET`; an instance-local ephemeral signing secret is generated automatically
 - `JWT_ISSUER` (defaults to `BACKEND_URL`)
 - `JWT_AUDIENCE` (defaults to `bbb-api`)
