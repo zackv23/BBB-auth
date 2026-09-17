@@ -33,9 +33,11 @@ class ServiceSettings:
             os.getenv("WEBSITE_URL", "http://localhost:3000"),
         )
         self.environment = os.getenv("ENVIRONMENT", "development")
+        self.uses_generated_dev_secret = False
         self.jwt_secret = os.getenv("JWT_SECRET", "").strip()
         if not self.jwt_secret and self.environment in ("development", "local", "test"):
-            self.jwt_secret = "dev-only-insecure-jwt-secret"
+            self.jwt_secret = secrets.token_urlsafe(48)
+            self.uses_generated_dev_secret = True
         self.jwt_issuer = os.getenv("JWT_ISSUER", os.getenv("BACKEND_URL", "http://localhost:8000"))
         self.jwt_audience = os.getenv("JWT_AUDIENCE", "bbb-api")
         self.access_token_minutes = int(os.getenv("ACCESS_TOKEN_MINUTES", "15"))
