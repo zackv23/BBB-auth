@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import secrets
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -25,6 +26,17 @@ def _require(name: str) -> str:
     return value
 
 
+def _parse_positive_int(name: str, default: int) -> int:
+    raw = os.getenv(name, str(default)).strip()
+    try:
+        value = int(raw)
+    except ValueError as e:
+        raise RuntimeError(f"Invalid {name}: expected integer, got {raw!r}") from e
+    if value <= 0:
+        raise RuntimeError(f"Invalid {name}: expected integer > 0, got {raw!r}")
+    return value
+
+
 class ServiceSettings:
     def __init__(self) -> None:
         self.redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -40,13 +52,30 @@ class ServiceSettings:
             self.uses_generated_dev_secret = True
         self.jwt_issuer = os.getenv("JWT_ISSUER", os.getenv("BACKEND_URL", "http://localhost:8000"))
         self.jwt_audience = os.getenv("JWT_AUDIENCE", "bbb-api")
-        self.access_token_minutes = int(os.getenv("ACCESS_TOKEN_MINUTES", "15"))
-        self.refresh_token_days = int(os.getenv("REFRESH_TOKEN_DAYS", "30"))
+        self.access_token_minutes = _parse_positive_int("ACCESS_TOKEN_MINUTES", 15)
+        self.refresh_token_days = _parse_positive_int("REFRESH_TOKEN_DAYS", 30)
 
 
 service_settings = ServiceSettings()
 oauth_settings = OAuthSettings()
-app = FastAPI(title="BBB-auth OAuth Layer", version="1.0.0")
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    if service_settings.environment not in ("development", "local", "test"):
+        _require("JWT_SECRET")
+
+    _app.state.redis = Redis.from_url(service_settings.redis_url, encoding="utf-8", decode_responses=True)
+    try:
+        await _app.state.redis.ping()
+        yield
+    finally:
+        redis_client: Redis | None = getattr(_app.state, "redis", None)
+        if redis_client is not None:
+            await redis_client.close()
+
+
+app = FastAPI(title="BBB-auth OAuth Layer", version="1.0.0", lifespan=lifespan)
 
 if service_settings.allowed_origins:
     app.add_middleware(
@@ -56,26 +85,6 @@ if service_settings.allowed_origins:
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
     )
-
-
-@app.on_event("startup")
-async def _startup() -> None:
-    if service_settings.environment not in ("development", "local", "test"):
-        _require("JWT_SECRET")
-    app.state.redis = Redis.from_url(service_settings.redis_url, encoding="utf-8", decode_responses=True)
-    try:
-        await app.state.redis.ping()
-    except Exception:
-        await app.state.redis.close()
-        raise
-
-
-@app.on_event("shutdown")
-async def _shutdown() -> None:
-    redis_client: Redis | None = getattr(app.state, "redis", None)
-    if redis_client is not None:
-        await redis_client.close()
-
 
 async def get_redis() -> Redis:
     redis_client: Redis | None = getattr(app.state, "redis", None)
@@ -151,5 +160,8 @@ async def live() -> dict[str, str]:
 @app.get("/health/ready")
 async def ready() -> dict[str, str]:
     redis_client = await get_redis()
-    await redis_client.ping()
+    try:
+        await redis_client.ping()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail="Redis not ready") from e
     return {"status": "ready"}
