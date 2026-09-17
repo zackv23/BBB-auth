@@ -80,13 +80,13 @@ uvicorn app:app --host 0.0.0.0 --port 8000
 
 Required runtime environment variables:
 
-- `REDIS_URL`
 - `JWT_SECRET` (required outside development/local/test)
 - `ALLOWED_ORIGINS` (comma-separated UI origins)
 - Provider credentials as needed (`GOOGLE_*`, `APPLE_*`, `GITHUB_*`)
 
 Optional token configuration:
 
+- `REDIS_URL` (default `redis://localhost:6379/0`)
 - `JWT_ISSUER` (defaults to `BACKEND_URL`)
 - `JWT_AUDIENCE` (defaults to `bbb-api`)
 - `ACCESS_TOKEN_MINUTES` (default `15`)

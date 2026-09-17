@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -57,7 +58,11 @@ async def _startup() -> None:
     if service_settings.environment not in ("development", "local", "test"):
         _require("JWT_SECRET")
     app.state.redis = Redis.from_url(service_settings.redis_url, encoding="utf-8", decode_responses=True)
-    await app.state.redis.ping()
+    try:
+        await app.state.redis.ping()
+    except Exception:
+        await app.state.redis.close()
+        raise
 
 
 @app.on_event("shutdown")
@@ -89,7 +94,12 @@ def _issue(provider_user: dict[str, Any]) -> tuple[str, str]:
         "iat": int(now.timestamp()),
     }
     access_token = jwt.encode(
-        {**base_claims, "exp": int((now + timedelta(minutes=service_settings.access_token_minutes)).timestamp())},
+        {
+            **base_claims,
+            "typ": "access",
+            "jti": secrets.token_urlsafe(12),
+            "exp": int((now + timedelta(minutes=service_settings.access_token_minutes)).timestamp()),
+        },
         service_settings.jwt_secret,
         algorithm="HS256",
     )
@@ -97,6 +107,7 @@ def _issue(provider_user: dict[str, Any]) -> tuple[str, str]:
         {
             **base_claims,
             "typ": "refresh",
+            "jti": secrets.token_urlsafe(12),
             "exp": int((now + timedelta(days=service_settings.refresh_token_days)).timestamp()),
         },
         service_settings.jwt_secret,
