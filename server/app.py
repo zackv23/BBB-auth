@@ -26,17 +26,20 @@ def _require(name: str) -> str:
 
 
 class ServiceSettings:
-    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-    allowed_origins = _env_csv(
-        "ALLOWED_ORIGINS",
-        os.getenv("WEBSITE_URL", "http://localhost:3000"),
-    )
-    jwt_secret = os.getenv("JWT_SECRET", "")
-    jwt_issuer = os.getenv("JWT_ISSUER", os.getenv("BACKEND_URL", "http://localhost:8000"))
-    jwt_audience = os.getenv("JWT_AUDIENCE", "bbb-api")
-    access_token_minutes = int(os.getenv("ACCESS_TOKEN_MINUTES", "15"))
-    refresh_token_days = int(os.getenv("REFRESH_TOKEN_DAYS", "30"))
-    environment = os.getenv("ENVIRONMENT", "development")
+    def __init__(self) -> None:
+        self.redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+        self.allowed_origins = _env_csv(
+            "ALLOWED_ORIGINS",
+            os.getenv("WEBSITE_URL", "http://localhost:3000"),
+        )
+        self.environment = os.getenv("ENVIRONMENT", "development")
+        self.jwt_secret = os.getenv("JWT_SECRET", "").strip()
+        if not self.jwt_secret and self.environment in ("development", "local", "test"):
+            self.jwt_secret = "dev-only-insecure-jwt-secret"
+        self.jwt_issuer = os.getenv("JWT_ISSUER", os.getenv("BACKEND_URL", "http://localhost:8000"))
+        self.jwt_audience = os.getenv("JWT_AUDIENCE", "bbb-api")
+        self.access_token_minutes = int(os.getenv("ACCESS_TOKEN_MINUTES", "15"))
+        self.refresh_token_days = int(os.getenv("REFRESH_TOKEN_DAYS", "30"))
 
 
 service_settings = ServiceSettings()
