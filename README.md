@@ -68,34 +68,34 @@ BigBBAuth.onAuthStateChange((user) => {
 });
 ```
 
-### 2. Server-Side (FastAPI)
+### 2. Server-Side (Standalone FastAPI OAuth Layer)
 
-Mount the OAuth router into your FastAPI application:
+Run BBB-auth as a standalone public OAuth service:
 
-```python
-from fastapi import FastAPI
-from server.oauth import create_oauth_router, OAuthSettings
-
-app = FastAPI()
-
-settings = OAuthSettings(
-    google_client_id="YOUR_GOOGLE_CLIENT_ID",
-    google_client_secret="YOUR_GOOGLE_CLIENT_SECRET",
-    apple_client_id="YOUR_APPLE_CLIENT_ID",
-    apple_team_id="YOUR_APPLE_TEAM_ID",
-    apple_key_id="YOUR_APPLE_KEY_ID",
-    apple_private_key="YOUR_ES256_PRIVATE_KEY",
-)
-
-oauth_router = create_oauth_router(
-    settings=settings,
-    get_redis=get_redis_dependency,
-    token_issuer=issue_jwt_tokens,
-    user_upsert=upsert_user_in_db,
-)
-
-app.include_router(oauth_router)
+```bash
+cd server
+pip install -r requirements.txt
+uvicorn app:app --host 0.0.0.0 --port 8000
 ```
+
+Required runtime environment variables:
+
+- `REDIS_URL`
+- `JWT_SECRET` (required outside development/local/test)
+- `ALLOWED_ORIGINS` (comma-separated UI origins)
+- Provider credentials as needed (`GOOGLE_*`, `APPLE_*`, `GITHUB_*`)
+
+Optional token configuration:
+
+- `JWT_ISSUER` (defaults to `BACKEND_URL`)
+- `JWT_AUDIENCE` (defaults to `bbb-api`)
+- `ACCESS_TOKEN_MINUTES` (default `15`)
+- `REFRESH_TOKEN_DAYS` (default `30`)
+
+Health endpoints:
+
+- `GET /health/live`
+- `GET /health/ready`
 
 ---
 
